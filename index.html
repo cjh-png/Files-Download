@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>媒體素材庫</title>
+  <script src="data.js"></script>
+  <style>
+    :root { --primary: #007aff; --bg: #f2f2f7; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; text-align: center; }
+    
+    header { margin-bottom: 25px; }
+    .tip { background: #fff; padding: 15px; border-radius: 12px; margin: 0 auto 20px; max-width: 500px; font-size: 13px; color: #666; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+    .btn-all { background: var(--primary); color: white; border: none; padding: 16px 20px; border-radius: 30px; font-size: 16px; font-weight: bold; width: 90%; max-width: 350px; box-shadow: 0 4px 12px rgba(0,122,255,0.3); cursor: pointer; }
+    .btn-all:disabled { opacity: 0.6; }
+
+    .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; max-width: 1000px; margin: 0 auto; }
+    .item { background: #fff; border-radius: 12px; overflow: hidden; position: relative; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    
+    /* 圖片預覽 */
+    .item img { width: 100%; height: 100%; object-fit: cover; }
+    .placeholder { font-size: 40px; }
+    
+    .file-info { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.6); color: white; font-size: 10px; padding: 3px 0; }
+    
+    /* 下載按鈕 */
+    .dl-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.9); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 16px; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h2 id="title">素材載入中...</h2>
+  <div id="platform-tip" class="tip"></div>
+  <button id="dlBtn" class="btn-all" onclick="downloadAll()">一鍵下載全部</button>
+</header>
+
+<div id="gallery" class="gallery"></div>
+
+<script>
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const dlDelay = isIOS ? 800 : 250; // iOS 需要較長延遲確保彈窗順序
+
+  window.onload = () => {
+    if (typeof fileList === 'undefined') {
+      document.body.innerHTML = "<h1>找不到 data.js，請先執行 node build.js</h1>";
+      return;
+    }
+    
+    document.getElementById('title').innerText = `媒體素材 (${fileList.length})`;
+    const tip = document.getElementById('platform-tip');
+    tip.innerHTML = isIOS ? "🍎 <b>iOS 提示：</b>點擊下載後請連續按「允許」。之後到「檔案」App 儲存到相簿。" : "💻 <b>提示：</b>若被攔截，請點擊網址列右側允許自動下載。";
+
+    const container = document.getElementById('gallery');
+    fileList.forEach(file => {
+      const div = document.createElement('div');
+      div.className = 'item';
+      
+      let preview = '';
+      if (file.type === 'image') {
+        preview = `<img src="${file.path}" loading="lazy">`;
+      } else if (file.type === 'video') {
+        preview = `<div class="placeholder">🎬</div>`;
+      } else {
+        preview = `<div class="placeholder">🎵</div>`;
+      }
+
+      div.innerHTML = `
+        ${preview}
+        <div class="file-info">${file.size}</div>
+        <a href="${file.path}" download="${file.name}" class="dl-btn">⬇️</a>
+      `;
+      container.appendChild(div);
+    });
+  };
+
+  async function downloadAll() {
+    if (!confirm(`確定下載 ${fileList.length} 個檔案？`)) return;
+    const btn = document.getElementById('dlBtn');
+    btn.disabled = true;
+
+    for (let i = 0; i < fileList.length; i++) {
+      btn.innerText = `下載中 (${i+1}/${fileList.length})...`;
+      const a = document.createElement('a');
+      a.href = fileList[i].path;
+      a.download = fileList[i].name; // GitHub 支持自定義檔名
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      await new Promise(r => setTimeout(r, dlDelay));
+    }
+
+    btn.innerText = "✅ 下載完成";
+    setTimeout(() => { btn.disabled = false; btn.innerText = "一鍵下載全部"; }, 3000);
+  }
+</script>
+</body>
+</html>
