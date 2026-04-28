@@ -47,6 +47,7 @@ function getFilesRecursively(dir) {
   return results;
 }
 
+
 console.log('🔍 正在掃描 files 資料夾...');
 const allFiles = getFilesRecursively(folderPath);
 
