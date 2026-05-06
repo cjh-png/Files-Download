@@ -56,3 +56,5 @@ const content = `// 自動生成，請勿手動修改\nconst fileList = ${JSON.s
 
 fs.writeFileSync(outputPath, content);
 console.log(`✅ 成功！已識別 ${allFiles.length} 個媒體檔案，並更新至 data.js`);
+
+//node build.js
