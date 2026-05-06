@@ -4,28 +4,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>媒體素材庫</title>
+  
   <script src="data.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
   <style>
     :root { --primary: #007aff; --bg: #f2f2f7; }
-    body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; text-align: center; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; text-align: center; -webkit-tap-highlight-color: transparent; }
     
     header { margin-bottom: 25px; }
-    .tip { background: #fff; padding: 15px; border-radius: 12px; margin: 0 auto 20px; max-width: 500px; font-size: 13px; color: #666; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .tip { background: #fff; padding: 15px; border-radius: 12px; margin: 0 auto 20px; max-width: 500px; font-size: 13px; color: #444; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,0.05); line-height: 1.5; }
 
-    .btn-all { background: var(--primary); color: white; border: none; padding: 16px 20px; border-radius: 30px; font-size: 16px; font-weight: bold; width: 90%; max-width: 350px; box-shadow: 0 4px 12px rgba(0,122,255,0.3); cursor: pointer; }
-    .btn-all:disabled { opacity: 0.6; }
+    .btn-all { background: var(--primary); color: white; border: none; padding: 16px 20px; border-radius: 30px; font-size: 16px; font-weight: bold; width: 90%; max-width: 350px; box-shadow: 0 4px 12px rgba(0,122,255,0.3); cursor: pointer; transition: 0.2s; }
+    .btn-all:active { transform: scale(0.96); }
+    .btn-all:disabled { background: #a1c9f7; cursor: not-allowed; transform: none; box-shadow: none; }
 
     .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; max-width: 1000px; margin: 0 auto; }
     .item { background: #fff; border-radius: 12px; overflow: hidden; position: relative; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
     
-    /* 圖片預覽 */
     .item img { width: 100%; height: 100%; object-fit: cover; }
     .placeholder { font-size: 40px; }
     
-    .file-info { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.6); color: white; font-size: 10px; padding: 3px 0; }
+    .file-info { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.6); color: white; font-size: 10px; padding: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     
-    /* 下載按鈕 */
-    .dl-btn { position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.9); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 16px; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .dl-btn { position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.9); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 16px; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
   </style>
 </head>
 <body>
@@ -33,14 +35,13 @@
 <header>
   <h2 id="title">素材載入中...</h2>
   <div id="platform-tip" class="tip"></div>
-  <button id="dlBtn" class="btn-all" onclick="downloadAll()">一鍵下載全部</button>
+  <button id="dlBtn" class="btn-all" onclick="downloadAllZip()">⬇️ 一鍵打包下載</button>
 </header>
 
 <div id="gallery" class="gallery"></div>
 
 <script>
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const dlDelay = isIOS ? 800 : 250; // iOS 需要較長延遲確保彈窗順序
 
   window.onload = () => {
     if (typeof fileList === 'undefined') {
@@ -49,8 +50,14 @@
     }
     
     document.getElementById('title').innerText = `媒體素材 (${fileList.length})`;
+    
+    // 🌟 更新提示文字，教導家長如何解壓縮
     const tip = document.getElementById('platform-tip');
-    tip.innerHTML = isIOS ? "🍎 <b>iOS 提示：</b>點擊下載後請連續按「允許」。之後到「檔案」App 儲存到相簿。" : "💻 <b>提示：</b>若被攔截，請點擊網址列右側允許自動下載。";
+    if (isIOS) {
+      tip.innerHTML = `🍎 <b>iPad/iPhone 提示：</b><br>1. 點擊按鈕後，會下載一個「壓縮檔」。<br>2. 請打開<b>「檔案」App</b> -> 點擊該壓縮檔，它會自動變成一個資料夾。<br>3. 點進資料夾，全選圖片即可儲存到相簿。`;
+    } else {
+      tip.innerHTML = `💻 <b>提示：</b>點擊下載後，系統會自動將所有檔案打包成單一 ZIP 壓縮檔，方便您一次保存。`;
+    }
 
     const container = document.getElementById('gallery');
     fileList.forEach(file => {
@@ -68,31 +75,62 @@
 
       div.innerHTML = `
         ${preview}
-        <div class="file-info">${file.size}</div>
+        <div class="file-info">${file.name}</div>
         <a href="${file.path}" download="${file.name}" class="dl-btn">⬇️</a>
       `;
       container.appendChild(div);
     });
   };
 
-  async function downloadAll() {
-    if (!confirm(`確定下載 ${fileList.length} 個檔案？`)) return;
+  // 🌟 全新的 ZIP 打包下載邏輯
+  async function downloadAllZip() {
+    if (!confirm(`確定要將這 ${fileList.length} 個檔案打包下載嗎？`)) return;
+    
     const btn = document.getElementById('dlBtn');
     btn.disabled = true;
 
-    for (let i = 0; i < fileList.length; i++) {
-      btn.innerText = `下載中 (${i+1}/${fileList.length})...`;
+    try {
+      const zip = new JSZip();
+      
+      for (let i = 0; i < fileList.length; i++) {
+        btn.innerText = `📦 抓取中 (${i+1}/${fileList.length})...`;
+        
+        // 抓取檔案的二進位資料 (因為在同一個 GitHub 網域，所以非常快且無 CORS 問題)
+        const response = await fetch(fileList[i].path);
+        const blob = await response.blob();
+        
+        // 將檔案放入壓縮包內
+        zip.file(fileList[i].name, blob);
+      }
+
+      btn.innerText = "⏳ 正在生成壓縮檔...";
+      
+      // 產生 ZIP 檔
+      const zipContent = await zip.generateAsync({ type: "blob" });
+      
+      // 觸發單次下載
       const a = document.createElement('a');
-      a.href = fileList[i].path;
-      a.download = fileList[i].name; // GitHub 支持自定義檔名
+      a.href = URL.createObjectURL(zipContent);
+      a.download = "所有素材打包.zip";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      await new Promise(r => setTimeout(r, dlDelay));
+      
+      // 釋放記憶體
+      URL.revokeObjectURL(a.href);
+
+      btn.innerText = "✅ 打包下載完成";
+    } catch (error) {
+      console.error(error);
+      alert("打包過程中發生錯誤，請確保網路連線正常。");
+      btn.innerText = "❌ 下載失敗";
     }
 
-    btn.innerText = "✅ 下載完成";
-    setTimeout(() => { btn.disabled = false; btn.innerText = "一鍵下載全部"; }, 3000);
+    // 3秒後恢復按鈕狀態
+    setTimeout(() => { 
+      btn.disabled = false; 
+      btn.innerText = "⬇️ 一鍵打包下載"; 
+    }, 3000);
   }
 </script>
 </body>
